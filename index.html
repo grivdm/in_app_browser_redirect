@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open in Browser</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+            color: #333;
+            text-align: center;
+        }
+
+        /* Скрываем всё по умолчанию, JS решит, что показать */
+        #main-content, #inapp-warning {
+            display: none;
+        }
+
+        .container {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            max-width: 90%;
+            width: 400px;
+        }
+
+        h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+        p { margin-bottom: 1.5rem; color: #666; line-height: 1.5; }
+
+        .btn {
+            display: inline-block;
+            background-color: #007AFF;
+            color: white;
+            padding: 15px 30px;
+            border-radius: 12px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1rem;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .btn:hover { background-color: #0056b3; }
+
+        /* Анимация стрелки для подсказки */
+        .arrow-hint {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            animation: bounce 2s infinite;
+            display: block;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {transform: translateY(0);}
+            40% {transform: translateY(-10px);}
+            60% {transform: translateY(-5px);}
+        }
+
+        .android-only { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="main-content">
+        <div class="container">
+            <h1>You are in a regular browser!</h1>
+            <p>Your target content is here.</p>
+            <a href="https://google.com" class="btn">Go to Website</a>
+        </div>
+    </div>
+
+    <div id="inapp-warning">
+        <div class="container">
+            <span class="arrow-hint">↗️</span>
+            <h1>Open in Browser</h1>
+            <p>The in-app browser limits some features. To continue, tap the button below or use the menu (three dots) in the corner.</p>
+            
+            <button id="android-intent-btn" class="btn android-only" onclick="tryAndroidIntent()">Open in Chrome</button>
+            
+            <div id="ios-instruction">
+                <p style="font-size: 0.9em; margin-top: 15px;">Tap the <strong>three dots (...)</strong> or <strong>Safari icon</strong> in the corner and select <strong>“Open in browser”</strong>.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Target link where we want to send the user
+        const TARGET_URL = window.location.href; // Or specify a particular URL, e.g., 'https://mysite.com'
+
+        function isInApp() {
+            const ua = navigator.userAgent || navigator.vendor || window.opera;
+            // List of in-app browser identifiers
+            const rules = [
+                'Instagram', 
+                'FBAV', // Facebook App
+                'FBAN', // Facebook App
+                'Line', 
+                'Twitter', 
+                'LinkedIn', 
+                'Telegram',
+                'Tik', // TikTok
+                'Snapchat'
+            ];
+            const pattern = new RegExp(rules.join('|'), 'i');
+            return pattern.test(ua);
+        }
+
+        function isAndroid() {
+            return /Android/i.test(navigator.userAgent);
+        }
+
+        function tryAndroidIntent() {
+            // Android allows using the intent:// scheme to force opening Chrome
+            const url = TARGET_URL.replace('https://', '').replace('http://', '');
+            const intentUrl = `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
+            window.location.href = intentUrl;
+        }
+
+        // Main logic on page load
+        window.onload = function() {
+            const inApp = isInApp();
+            const mainContent = document.getElementById('main-content');
+            const warningContent = document.getElementById('inapp-warning');
+            const androidBtn = document.getElementById('android-intent-btn');
+            const iosInstr = document.getElementById('ios-instruction');
+
+            if (inApp) {
+                warningContent.style.display = 'flex';
+                
+                if (isAndroid()) {
+                    // If Android, show the "Magic" transition button
+                    androidBtn.style.display = 'inline-block';
+                    iosInstr.style.display = 'none';
+                    // You can try autoclick (does not always work)
+                    // tryAndroidIntent(); 
+                } else {
+                    // If iOS or other, only show the instruction, since jumping out programmatically is difficult
+                    androidBtn.style.display = 'none';
+                }
+            } else {
+                // If a normal browser, show content or redirect
+                mainContent.style.display = 'flex';
+                // window.location.href = "https://kuda-vam-nado.ru"; // Uncomment for auto-redirect
+            }
+        };
+    </script>
+</body>
+</html>
