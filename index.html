@@ -221,14 +221,14 @@
     <div id="inapp-warning">
         <div class="container">
             <div class="success-message" id="success-message">
-                ✓ Successfully opened in Chrome!
+                ✓ Successfully opened in Browser!
             </div>
             <span class="arrow-hint">↗️</span>
             <h1>Open in Browser</h1>
             <p>The in-app browser limits some features. To continue, tap the button below.</p>
             
-            <button id="android-intent-btn" class="btn android-only" onclick="tryAndroidIntent()">Open in Chrome</button>
-            <button id="ios-open-btn" class="btn" onclick="tryOpenInChromeIOS()">Open in Chrome</button>
+            <button id="android-intent-btn" class="btn android-only" onclick="tryAndroidIntent()">Open in Browser</button>
+            <button id="ios-open-btn" class="btn" onclick="tryOpenInChromeIOS()">Open in Browser</button>
         </div>
     </div>
 
@@ -272,6 +272,11 @@
         }
 
         function isInApp() {
+            // If we're in Chrome, it's not an in-app browser
+            if (isChrome()) {
+                return false;
+            }
+            
             const rules = [
                 'Instagram', 'FBAV', 'FBAN', 'Line', 'Twitter', 
                 'LinkedIn', 'Telegram', 'Tik', 'Snapchat'
@@ -279,11 +284,16 @@
             const pattern = new RegExp(rules.join('|'), 'i');
             const hasWKMessageHandlers = isIOS() && !!(window.webkit && window.webkit.messageHandlers);
             const isIOSWebView = isIOS() && !isIOSSafari() && !isIOSAltBrowser();
-            return pattern.test(UA) || hasWKMessageHandlers || isIOSWebView;
+            return pattern.test(UA) || (hasWKMessageHandlers && !isChrome()) || isIOSWebView;
         }
 
         function isAndroid() {
             return /Android/i.test(UA);
+        }
+
+        function isChrome() {
+            // Check for Chrome on iOS (CriOS) or Chrome on Android/Desktop
+            return /CriOS/.test(UA) || /Chrome/.test(UA) && !/Edg|OPR|FxiOS/.test(UA);
         }
 
         function showSuccessMessage() {
@@ -351,7 +361,7 @@
         function tryShareOrCopy(url) {
             if (navigator.share) {
                 navigator.share({
-                    title: document.title || 'Open in Chrome',
+                    title: document.title || 'Open in Browser',
                     url: url
                 }).then(() => {
                     showSuccessMessage();
@@ -407,6 +417,7 @@
             const isIOSSafariBrowser = isIOSSafari();
             const isIOSAltBrowserDevice = isIOSAltBrowser();
             const isIPadOSDevice = isIPadOS();
+            const isChromeBrowser = isChrome();
             const hasWKMessageHandlers = isIOS() && !!(window.webkit && window.webkit.messageHandlers);
 
             return {
@@ -415,6 +426,7 @@
                 'Current URL': window.location.href,
                 'Target URL': TARGET_URL,
                 'Is In-App Browser': inApp ? 'Yes ✓' : 'No ✗',
+                'Is Chrome': isChromeBrowser ? 'Yes ✓' : 'No ✗',
                 'Is iOS': isIOSDevice ? 'Yes ✓' : 'No ✗',
                 'Is iPadOS': isIPadOSDevice ? 'Yes ✓' : 'No ✗',
                 'Is iOS Safari': isIOSSafariBrowser ? 'Yes ✓' : 'No ✗',
@@ -509,7 +521,7 @@
             }
 
             // Check if we're in Chrome and NOT in in-app browser (successful redirect)
-            const isNowInChrome = /CriOS/.test(UA);
+            const isNowInChrome = isChrome();
             const isInAppBrowser = isInApp();
             
             if (isNowInChrome && !isInAppBrowser) {
