@@ -177,6 +177,37 @@
             color: #666;
             word-break: break-all;
         }
+
+        .debug-copy-btn {
+            background-color: #007AFF;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-right: 10px;
+            transition: background 0.2s;
+        }
+
+        .debug-copy-btn:hover {
+            background-color: #0056b3;
+        }
+
+        .debug-copy-btn:active {
+            background-color: #004494;
+        }
+
+        .debug-copy-btn.copied {
+            background-color: #34C759;
+        }
+
+        .debug-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
@@ -211,7 +242,10 @@
         <div class="debug-modal-content" onclick="event.stopPropagation()">
             <div class="debug-modal-header">
                 <h2>Debug Information</h2>
-                <button class="debug-close" onclick="closeDebugPopup()">×</button>
+                <div class="debug-header-actions">
+                    <button class="debug-copy-btn" id="debug-copy-btn" onclick="copyDebugInfo()">📋 Copy All</button>
+                    <button class="debug-close" onclick="closeDebugPopup()">×</button>
+                </div>
             </div>
             <div class="debug-info" id="debug-info-content">
                 <!-- Debug info will be populated here -->
@@ -323,6 +357,65 @@
 
             content.innerHTML = html;
             modal.classList.add('active');
+        }
+
+        function copyDebugInfo() {
+            const debugInfo = getDebugInfo();
+            let text = 'Debug Information\n';
+            text += '==================\n\n';
+            
+            for (const [key, value] of Object.entries(debugInfo)) {
+                text += `${key}: ${value}\n`;
+            }
+            
+            // Try to use modern Clipboard API
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    showCopyFeedback();
+                }).catch(function(err) {
+                    // Fallback to older method if Clipboard API fails
+                    fallbackCopyTextToClipboard(text);
+                });
+            } else {
+                // Fallback for older browsers
+                fallbackCopyTextToClipboard(text);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    showCopyFeedback();
+                } else {
+                    alert('Failed to copy. Please select and copy manually.');
+                }
+            } catch (err) {
+                alert('Failed to copy. Please select and copy manually.');
+            }
+            
+            document.body.removeChild(textArea);
+        }
+
+        function showCopyFeedback() {
+            const copyBtn = document.getElementById('debug-copy-btn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '✓ Copied!';
+            copyBtn.classList.add('copied');
+            
+            setTimeout(function() {
+                copyBtn.textContent = originalText;
+                copyBtn.classList.remove('copied');
+            }, 2000);
         }
 
         function closeDebugPopup(event) {
