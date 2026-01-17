@@ -68,6 +68,115 @@
         }
 
         .android-only { display: none; }
+
+        /* Debug button styles */
+        .debug-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #666;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            border: none;
+            cursor: pointer;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        .debug-btn:hover {
+            background-color: #555;
+        }
+
+        /* Modal/Popup styles */
+        .debug-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .debug-modal.active {
+            display: flex;
+        }
+
+        .debug-modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            max-width: 90%;
+            width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .debug-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .debug-modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .debug-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #666;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .debug-close:hover {
+            color: #000;
+        }
+
+        .debug-info {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .debug-info-item {
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .debug-info-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .debug-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 0.25rem;
+        }
+
+        .debug-value {
+            color: #666;
+            word-break: break-all;
+        }
     </style>
 </head>
 <body>
@@ -89,7 +198,23 @@
             <button id="android-intent-btn" class="btn android-only" onclick="tryAndroidIntent()">Open in Chrome</button>
             
             <div id="ios-instruction">
-                <p style="font-size: 0.9em; margin-top: 15px;">Tap the <strong>three dots (...)</strong> or <strong>Safari icon</strong> in the corner and select <strong>“Open in browser”</strong>.</p>
+                <p style="font-size: 0.9em; margin-top: 15px;">Tap the <strong>three dots (...)</strong> or <strong>Safari icon</strong> in the corner and select <strong>"Open in browser"</strong>.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Debug Button -->
+    <button class="debug-btn" onclick="openDebugPopup()">🐛 Debug</button>
+
+    <!-- Debug Modal -->
+    <div id="debug-modal" class="debug-modal" onclick="closeDebugPopup(event)">
+        <div class="debug-modal-content" onclick="event.stopPropagation()">
+            <div class="debug-modal-header">
+                <h2>Debug Information</h2>
+                <button class="debug-close" onclick="closeDebugPopup()">×</button>
+            </div>
+            <div class="debug-info" id="debug-info-content">
+                <!-- Debug info will be populated here -->
             </div>
         </div>
     </div>
@@ -100,8 +225,13 @@
 
         const UA = navigator.userAgent || navigator.vendor || window.opera;
 
+        function isIPadOS() {
+            // iPadOS 13+ can report itself as "Macintosh"
+            return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        }
+
         function isIOS() {
-            return /iPad|iPhone|iPod/.test(UA) && !window.MSStream;
+            return (/iPad|iPhone|iPod/.test(UA) && !window.MSStream) || isIPadOS();
         }
 
         function isIOSSafari() {
@@ -142,6 +272,73 @@
             const intentUrl = `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
             window.location.href = intentUrl;
         }
+
+        // Debug functions
+        function getDebugInfo() {
+            const inApp = isInApp();
+            const isIOSDevice = isIOS();
+            const isAndroidDevice = isAndroid();
+            const isIOSSafariBrowser = isIOSSafari();
+            const isIOSAltBrowserDevice = isIOSAltBrowser();
+            const isIPadOSDevice = isIPadOS();
+            const hasWKMessageHandlers = isIOS() && !!(window.webkit && window.webkit.messageHandlers);
+
+            return {
+                'User Agent': UA,
+                'Platform': navigator.platform || 'Unknown',
+                'Current URL': window.location.href,
+                'Target URL': TARGET_URL,
+                'Is In-App Browser': inApp ? 'Yes ✓' : 'No ✗',
+                'Is iOS': isIOSDevice ? 'Yes ✓' : 'No ✗',
+                'Is iPadOS': isIPadOSDevice ? 'Yes ✓' : 'No ✗',
+                'Is iOS Safari': isIOSSafariBrowser ? 'Yes ✓' : 'No ✗',
+                'Is iOS Alt Browser': isIOSAltBrowserDevice ? 'Yes ✓' : 'No ✗',
+                'Is Android': isAndroidDevice ? 'Yes ✓' : 'No ✗',
+                'Has WKMessageHandlers': hasWKMessageHandlers ? 'Yes ✓' : 'No ✗',
+                'Screen Width': window.screen.width + 'px',
+                'Screen Height': window.screen.height + 'px',
+                'Window Width': window.innerWidth + 'px',
+                'Window Height': window.innerHeight + 'px',
+                'Touch Points': navigator.maxTouchPoints || 0,
+                'Language': navigator.language || 'Unknown',
+                'Cookie Enabled': navigator.cookieEnabled ? 'Yes ✓' : 'No ✗',
+                'OnLine Status': navigator.onLine ? 'Online ✓' : 'Offline ✗'
+            };
+        }
+
+        function openDebugPopup() {
+            const modal = document.getElementById('debug-modal');
+            const content = document.getElementById('debug-info-content');
+            const debugInfo = getDebugInfo();
+
+            let html = '';
+            for (const [key, value] of Object.entries(debugInfo)) {
+                html += `
+                    <div class="debug-info-item">
+                        <div class="debug-label">${key}:</div>
+                        <div class="debug-value">${value}</div>
+                    </div>
+                `;
+            }
+
+            content.innerHTML = html;
+            modal.classList.add('active');
+        }
+
+        function closeDebugPopup(event) {
+            const modal = document.getElementById('debug-modal');
+            // If event is provided and clicked outside modal, close it
+            if (!event || event.target === modal) {
+                modal.classList.remove('active');
+            }
+        }
+
+        // Close modal on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeDebugPopup();
+            }
+        });
 
         // Main logic on page load
         window.onload = function() {
