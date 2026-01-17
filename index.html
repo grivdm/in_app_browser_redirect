@@ -18,6 +18,10 @@
             text-align: center;
         }
 
+        #inapp-warning {
+            display: none;
+        }
+
         .container {
             background: white;
             padding: 2rem;
@@ -514,24 +518,33 @@
             const androidBtn = document.getElementById('android-intent-btn');
             const iosOpenBtn = document.getElementById('ios-open-btn');
 
-            warningContent.style.display = 'flex';
+            // Check if we're in an in-app browser
+            const isInAppBrowser = isInApp();
+            const isNowInChrome = isChrome();
+            const redirectAttempted = sessionStorage.getItem('redirectAttempted') === 'true';
             
-            if (isAndroid()) {
-                androidBtn.style.display = 'inline-block';
-                iosOpenBtn.style.display = 'none';
+            // Only show warning if we're in an in-app browser
+            if (isInAppBrowser) {
+                warningContent.style.display = 'flex';
+                
+                if (isAndroid()) {
+                    androidBtn.style.display = 'inline-block';
+                    iosOpenBtn.style.display = 'none';
+                } else {
+                    androidBtn.style.display = 'none';
+                    iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
+                }
             } else {
-                androidBtn.style.display = 'none';
-                iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
+                // Not in in-app browser - hide the warning
+                warningContent.style.display = 'none';
             }
 
             // Check if we're in Chrome and NOT in in-app browser (successful redirect)
             // Only show success message if a redirect was actually attempted
-            const isNowInChrome = isChrome();
-            const isInAppBrowser = isInApp();
-            const redirectAttempted = sessionStorage.getItem('redirectAttempted') === 'true';
-            
             if (isNowInChrome && !isInAppBrowser && redirectAttempted) {
                 // We successfully opened in Chrome after a redirect attempt - show success message
+                // Show the warning container temporarily to display the success message
+                warningContent.style.display = 'flex';
                 setTimeout(() => showSuccessMessage(), 300);
                 // Clear the flag after showing the message
                 sessionStorage.removeItem('redirectAttempted');
