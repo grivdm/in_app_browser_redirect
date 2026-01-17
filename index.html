@@ -307,6 +307,8 @@
         }
 
         function tryAndroidIntent() {
+            // Mark that a redirect attempt was made
+            sessionStorage.setItem('redirectAttempted', 'true');
             const url = TARGET_URL.replace('https://', '').replace('http://', '');
             const intentUrl = `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
             window.location.href = intentUrl;
@@ -326,6 +328,8 @@
         }
 
         function tryOpenInChromeIOS() {
+            // Mark that a redirect attempt was made
+            sessionStorage.setItem('redirectAttempted', 'true');
             const url = TARGET_URL;
             const chromeUrl = buildChromeUrl(url);
             
@@ -521,12 +525,19 @@
             }
 
             // Check if we're in Chrome and NOT in in-app browser (successful redirect)
+            // Only show success message if a redirect was actually attempted
             const isNowInChrome = isChrome();
             const isInAppBrowser = isInApp();
+            const redirectAttempted = sessionStorage.getItem('redirectAttempted') === 'true';
             
-            if (isNowInChrome && !isInAppBrowser) {
-                // We successfully opened in Chrome - show success message
+            if (isNowInChrome && !isInAppBrowser && redirectAttempted) {
+                // We successfully opened in Chrome after a redirect attempt - show success message
                 setTimeout(() => showSuccessMessage(), 300);
+                // Clear the flag after showing the message
+                sessionStorage.removeItem('redirectAttempted');
+            } else if (redirectAttempted) {
+                // Redirect was attempted but we're still in in-app browser, clear the flag
+                sessionStorage.removeItem('redirectAttempted');
             }
         };
     </script>
