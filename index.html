@@ -18,10 +18,6 @@
             text-align: center;
         }
 
-        #inapp-warning {
-            display: none;
-        }
-
         .container {
             background: white;
             padding: 2rem;
@@ -303,16 +299,17 @@
         function showSuccessMessage() {
             const successMsg = document.getElementById('success-message');
             if (successMsg) {
+                // Ensure the element is visible
+                successMsg.style.display = 'block';
                 successMsg.classList.add('show');
                 setTimeout(() => {
                     successMsg.classList.remove('show');
+                    successMsg.style.display = 'none';
                 }, 5000);
             }
         }
 
         function tryAndroidIntent() {
-            // Mark that a redirect attempt was made
-            sessionStorage.setItem('redirectAttempted', 'true');
             const url = TARGET_URL.replace('https://', '').replace('http://', '');
             const intentUrl = `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
             window.location.href = intentUrl;
@@ -332,8 +329,6 @@
         }
 
         function tryOpenInChromeIOS() {
-            // Mark that a redirect attempt was made
-            sessionStorage.setItem('redirectAttempted', 'true');
             const url = TARGET_URL;
             const chromeUrl = buildChromeUrl(url);
             
@@ -517,40 +512,46 @@
             const warningContent = document.getElementById('inapp-warning');
             const androidBtn = document.getElementById('android-intent-btn');
             const iosOpenBtn = document.getElementById('ios-open-btn');
-
-            // Check if we're in an in-app browser
-            const isInAppBrowser = isInApp();
-            const isNowInChrome = isChrome();
-            const redirectAttempted = sessionStorage.getItem('redirectAttempted') === 'true';
             
-            // Only show warning if we're in an in-app browser
-            if (isInAppBrowser) {
-                warningContent.style.display = 'flex';
-                
-                if (isAndroid()) {
-                    androidBtn.style.display = 'inline-block';
-                    iosOpenBtn.style.display = 'none';
-                } else {
-                    androidBtn.style.display = 'none';
-                    iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
-                }
-            } else {
-                // Not in in-app browser - hide the warning
-                warningContent.style.display = 'none';
-            }
+            if (!warningContent) return;
+            
+            const container = warningContent.querySelector('.container');
+            const arrowHint = container ? container.querySelector('.arrow-hint') : null;
+            const heading = container ? container.querySelector('h1') : null;
+            const paragraph = container ? container.querySelector('p') : null;
 
             // Check if we're in Chrome and NOT in in-app browser (successful redirect)
-            // Only show success message if a redirect was actually attempted
-            if (isNowInChrome && !isInAppBrowser && redirectAttempted) {
-                // We successfully opened in Chrome after a redirect attempt - show success message
-                // Show the warning container temporarily to display the success message
+            const isNowInChrome = isChrome();
+            const isInAppBrowser = isInApp();
+            
+            if (isNowInChrome && !isInAppBrowser) {
+                // We successfully opened in Chrome - show only success message
                 warningContent.style.display = 'flex';
+                // Hide other elements, show only success message
+                if (arrowHint) arrowHint.style.display = 'none';
+                if (heading) heading.style.display = 'none';
+                if (paragraph) paragraph.style.display = 'none';
+                if (androidBtn) androidBtn.style.display = 'none';
+                if (iosOpenBtn) iosOpenBtn.style.display = 'none';
+                // Show success message
                 setTimeout(() => showSuccessMessage(), 300);
-                // Clear the flag after showing the message
-                sessionStorage.removeItem('redirectAttempted');
-            } else if (redirectAttempted) {
-                // Redirect was attempted but we're still in in-app browser, clear the flag
-                sessionStorage.removeItem('redirectAttempted');
+            } else if (isInAppBrowser) {
+                // We're in an in-app browser - show full warning
+                warningContent.style.display = 'flex';
+                if (arrowHint) arrowHint.style.display = 'block';
+                if (heading) heading.style.display = 'block';
+                if (paragraph) paragraph.style.display = 'block';
+                
+                if (isAndroid()) {
+                    if (androidBtn) androidBtn.style.display = 'inline-block';
+                    if (iosOpenBtn) iosOpenBtn.style.display = 'none';
+                } else {
+                    if (androidBtn) androidBtn.style.display = 'none';
+                    if (iosOpenBtn) iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
+                }
+            } else {
+                // Not in Chrome and not in in-app browser - hide everything
+                warningContent.style.display = 'none';
             }
         };
     </script>
