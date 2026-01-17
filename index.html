@@ -227,10 +227,10 @@
             <p>The in-app browser limits some features. To continue, tap the button below or use the menu (three dots) in the corner.</p>
             
             <button id="android-intent-btn" class="btn android-only" onclick="tryAndroidIntent()">Open in Chrome</button>
-            <button id="ios-open-btn" class="btn" onclick="tryOpenInSafari()">Open in Safari</button>
+            <button id="ios-open-btn" class="btn" onclick="tryOpenInChromeIOS()">Open in Chrome</button>
             
             <div id="ios-instruction">
-                <p style="font-size: 0.9em; margin-top: 15px;">Tap <strong>Open in Safari</strong> above or use the menu (three dots / Safari icon) and select <strong>"Open in browser"</strong>.</p>
+                <p style="font-size: 0.9em; margin-top: 15px;">Tap <strong>Open in Chrome</strong> above or use the menu (three dots / Safari icon) and select <strong>"Open in browser"</strong>.</p>
             </div>
         </div>
     </div>
@@ -465,18 +465,35 @@
             }
         };
 
-        function tryOpenInSafari() {
-            const url = TARGET_URL;
-            // Try the same approach Timeleft uses on web: window.open with _blank.
-            // Some in-app browsers (including LinkedIn) intercept this and open Safari.
+        function buildChromeUrl(rawUrl) {
             try {
-                const opened = window.open(url, '_blank');
-                if (opened) {
-                    opened.focus();
-                    return;
+                const url = new URL(rawUrl);
+                if (url.protocol === 'https:') {
+                    return `googlechromes://${url.host}${url.pathname}${url.search}${url.hash}`;
+                }
+                if (url.protocol === 'http:') {
+                    return `googlechrome://${url.host}${url.pathname}${url.search}${url.hash}`;
                 }
             } catch (e) {
-                // Ignore and fall back to other options
+                // Ignore invalid URLs
+            }
+            return null;
+        }
+
+        function tryOpenInChromeIOS() {
+            const url = TARGET_URL;
+            const chromeUrl = buildChromeUrl(url);
+            if (chromeUrl) {
+                // iOS Chrome URL scheme: open directly in Chrome if installed
+                const fallbackTimer = setTimeout(function() {
+                    // If Chrome is not installed or scheme is blocked, fall back
+                    tryShareOrCopy(url);
+                }, 1200);
+                window.addEventListener('pagehide', function() {
+                    clearTimeout(fallbackTimer);
+                }, { once: true });
+                window.location.href = chromeUrl;
+                return;
             }
 
             // Fallback: a synthetic <a target="_blank"> click
@@ -491,14 +508,16 @@
                 document.body.removeChild(a);
                 return;
             } catch (e) {
-                // Ignore and fall back to Share Sheet
+                // Ignore and fall back to share/copy
             }
 
-            // iOS does not allow direct programmatic opening of Safari from in-app.
-            // Best available UX is the Share Sheet, which includes "Open in Safari".
+            tryShareOrCopy(url);
+        }
+
+        function tryShareOrCopy(url) {
             if (navigator.share) {
                 navigator.share({
-                    title: document.title || 'Open in Safari',
+                    title: document.title || 'Open in Chrome',
                     url: url
                 }).catch(function() {
                     // User dismissed Share Sheet; fall back to copy
@@ -512,7 +531,7 @@
         function copyLinkToClipboard(text) {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(function() {
-                    alert('Link copied. Use "Open in Safari" from the share menu.');
+                    alert('Link copied. Open it in Chrome.');
                 }).catch(function() {
                     fallbackCopyTextToClipboard(text);
                 });
