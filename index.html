@@ -18,11 +18,6 @@
             text-align: center;
         }
 
-        /* Скрываем всё по умолчанию, JS решит, что показать */
-        #main-content, #inapp-warning {
-            display: none;
-        }
-
         .container {
             background: white;
             padding: 2rem;
@@ -53,7 +48,6 @@
 
         .btn:hover { background-color: #0056b3; }
 
-        /* Анимация стрелки для подсказки */
         .arrow-hint {
             font-size: 2rem;
             margin-bottom: 10px;
@@ -68,6 +62,19 @@
         }
 
         .android-only { display: none; }
+
+        .success-message {
+            background-color: #34C759;
+            color: white;
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .success-message.show {
+            display: block;
+        }
 
         /* Debug button styles */
         .debug-btn {
@@ -211,27 +218,17 @@
     </style>
 </head>
 <body>
-
-    <div id="main-content">
-        <div class="container">
-            <h1>You are in a regular browser!</h1>
-            <p>Your target content is here.</p>
-            <a href="https://google.com" class="btn">Go to Website</a>
-        </div>
-    </div>
-
     <div id="inapp-warning">
         <div class="container">
+            <div class="success-message" id="success-message">
+                ✓ Successfully opened in Chrome!
+            </div>
             <span class="arrow-hint">↗️</span>
             <h1>Open in Browser</h1>
-            <p>The in-app browser limits some features. To continue, tap the button below or use the menu (three dots) in the corner.</p>
+            <p>The in-app browser limits some features. To continue, tap the button below.</p>
             
             <button id="android-intent-btn" class="btn android-only" onclick="tryAndroidIntent()">Open in Chrome</button>
             <button id="ios-open-btn" class="btn" onclick="tryOpenInChromeIOS()">Open in Chrome</button>
-            
-            <div id="ios-instruction">
-                <p style="font-size: 0.9em; margin-top: 15px;">Tap <strong>Open in Chrome</strong> above or use the menu (three dots / Safari icon) and select <strong>"Open in browser"</strong>.</p>
-            </div>
         </div>
     </div>
 
@@ -255,13 +252,10 @@
     </div>
 
     <script>
-        // Target link where we want to send the user
-        const TARGET_URL = window.location.href; // Or specify a particular URL, e.g., 'https://mysite.com'
-
+        const TARGET_URL = window.location.href;
         const UA = navigator.userAgent || navigator.vendor || window.opera;
 
         function isIPadOS() {
-            // iPadOS 13+ can report itself as "Macintosh"
             return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
         }
 
@@ -274,22 +268,13 @@
         }
 
         function isIOSAltBrowser() {
-            // iOS browsers that are not in-app webviews
             return /CriOS|FxiOS|EdgiOS|OPiOS/.test(UA);
         }
 
         function isInApp() {
-            // List of in-app browser identifiers
             const rules = [
-                'Instagram',
-                'FBAV', // Facebook App
-                'FBAN', // Facebook App
-                'Line',
-                'Twitter',
-                'LinkedIn',
-                'Telegram',
-                'Tik', // TikTok
-                'Snapchat'
+                'Instagram', 'FBAV', 'FBAN', 'Line', 'Twitter', 
+                'LinkedIn', 'Telegram', 'Tik', 'Snapchat'
             ];
             const pattern = new RegExp(rules.join('|'), 'i');
             const hasWKMessageHandlers = isIOS() && !!(window.webkit && window.webkit.messageHandlers);
@@ -301,11 +286,122 @@
             return /Android/i.test(UA);
         }
 
+        function showSuccessMessage() {
+            const successMsg = document.getElementById('success-message');
+            if (successMsg) {
+                successMsg.classList.add('show');
+                setTimeout(() => {
+                    successMsg.classList.remove('show');
+                }, 5000);
+            }
+        }
+
         function tryAndroidIntent() {
-            // Android allows using the intent:// scheme to force opening Chrome
             const url = TARGET_URL.replace('https://', '').replace('http://', '');
             const intentUrl = `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
+            sessionStorage.setItem('chromeRedirectAttempted', 'true');
             window.location.href = intentUrl;
+            setTimeout(() => showSuccessMessage(), 500);
+        }
+
+        function buildChromeUrl(rawUrl) {
+            try {
+                const url = new URL(rawUrl);
+                if (url.protocol === 'https:') {
+                    return `googlechromes://${url.host}${url.pathname}${url.search}${url.hash}`;
+                }
+                if (url.protocol === 'http:') {
+                    return `googlechrome://${url.host}${url.pathname}${url.search}${url.hash}`;
+                }
+            } catch (e) {}
+            return null;
+        }
+
+        function tryOpenInChromeIOS() {
+            const url = TARGET_URL;
+            const chromeUrl = buildChromeUrl(url);
+            
+            if (chromeUrl) {
+                sessionStorage.setItem('chromeRedirectAttempted', 'true');
+                const fallbackTimer = setTimeout(function() {
+                    tryShareOrCopy(url);
+                }, 1200);
+                
+                window.addEventListener('pagehide', function() {
+                    clearTimeout(fallbackTimer);
+                    showSuccessMessage();
+                }, { once: true });
+                
+                window.location.href = chromeUrl;
+                setTimeout(() => showSuccessMessage(), 500);
+                return;
+            }
+
+            try {
+                const a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => showSuccessMessage(), 500);
+                return;
+            } catch (e) {}
+
+            tryShareOrCopy(url);
+        }
+
+        function tryShareOrCopy(url) {
+            if (navigator.share) {
+                navigator.share({
+                    title: document.title || 'Open in Chrome',
+                    url: url
+                }).then(() => {
+                    showSuccessMessage();
+                }).catch(function() {
+                    copyLinkToClipboard(url);
+                });
+                return;
+            }
+            copyLinkToClipboard(url);
+        }
+
+        function copyLinkToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    alert('Link copied. Open it in Chrome.');
+                }).catch(function() {
+                    fallbackCopyTextToClipboard(text);
+                });
+            } else {
+                fallbackCopyTextToClipboard(text);
+            }
+        }
+
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            textArea.style.position = 'fixed';
+            textArea.style.left = '-999999px';
+            textArea.style.top = '-999999px';
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    alert('Link copied. Open it in Chrome.');
+                } else {
+                    alert('Failed to copy. Please select and copy manually.');
+                }
+            } catch (err) {
+                alert('Failed to copy. Please select and copy manually.');
+            }
+            
+            document.body.removeChild(textArea);
         }
 
         // Debug functions
@@ -369,42 +465,15 @@
                 text += `${key}: ${value}\n`;
             }
             
-            // Try to use modern Clipboard API
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(function() {
                     showCopyFeedback();
                 }).catch(function(err) {
-                    // Fallback to older method if Clipboard API fails
                     fallbackCopyTextToClipboard(text);
                 });
             } else {
-                // Fallback for older browsers
                 fallbackCopyTextToClipboard(text);
             }
-        }
-
-        function fallbackCopyTextToClipboard(text) {
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            textArea.style.position = 'fixed';
-            textArea.style.left = '-999999px';
-            textArea.style.top = '-999999px';
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            
-            try {
-                const successful = document.execCommand('copy');
-                if (successful) {
-                    showCopyFeedback();
-                } else {
-                    alert('Failed to copy. Please select and copy manually.');
-                }
-            } catch (err) {
-                alert('Failed to copy. Please select and copy manually.');
-            }
-            
-            document.body.removeChild(textArea);
         }
 
         function showCopyFeedback() {
@@ -421,13 +490,11 @@
 
         function closeDebugPopup(event) {
             const modal = document.getElementById('debug-modal');
-            // If event is provided and clicked outside modal, close it
             if (!event || event.target === modal) {
                 modal.classList.remove('active');
             }
         }
 
-        // Close modal on Escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeDebugPopup();
@@ -436,109 +503,26 @@
 
         // Main logic on page load
         window.onload = function() {
-            const inApp = isInApp();
-            const mainContent = document.getElementById('main-content');
             const warningContent = document.getElementById('inapp-warning');
             const androidBtn = document.getElementById('android-intent-btn');
             const iosOpenBtn = document.getElementById('ios-open-btn');
-            const iosInstr = document.getElementById('ios-instruction');
 
-            if (inApp) {
-                warningContent.style.display = 'flex';
-                
-                if (isAndroid()) {
-                    // If Android, show the "Magic" transition button
-                    androidBtn.style.display = 'inline-block';
-                    iosOpenBtn.style.display = 'none';
-                    iosInstr.style.display = 'none';
-                    // You can try autoclick (does not always work)
-                    // tryAndroidIntent(); 
-                } else {
-                    // If iOS or other, only show the instruction, since jumping out programmatically is difficult
-                    androidBtn.style.display = 'none';
-                    iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
-                }
+            warningContent.style.display = 'flex';
+            
+            if (isAndroid()) {
+                androidBtn.style.display = 'inline-block';
+                iosOpenBtn.style.display = 'none';
             } else {
-                // If a normal browser, show content or redirect
-                mainContent.style.display = 'flex';
-                // window.location.href = "https://kuda-vam-nado.ru"; // Uncomment for auto-redirect
+                androidBtn.style.display = 'none';
+                iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
+            }
+
+            // Check if user returned after redirect attempt
+            if (sessionStorage.getItem('chromeRedirectAttempted') === 'true') {
+                sessionStorage.removeItem('chromeRedirectAttempted');
+                showSuccessMessage();
             }
         };
-
-        function buildChromeUrl(rawUrl) {
-            try {
-                const url = new URL(rawUrl);
-                if (url.protocol === 'https:') {
-                    return `googlechromes://${url.host}${url.pathname}${url.search}${url.hash}`;
-                }
-                if (url.protocol === 'http:') {
-                    return `googlechrome://${url.host}${url.pathname}${url.search}${url.hash}`;
-                }
-            } catch (e) {
-                // Ignore invalid URLs
-            }
-            return null;
-        }
-
-        function tryOpenInChromeIOS() {
-            const url = TARGET_URL;
-            const chromeUrl = buildChromeUrl(url);
-            if (chromeUrl) {
-                // iOS Chrome URL scheme: open directly in Chrome if installed
-                const fallbackTimer = setTimeout(function() {
-                    // If Chrome is not installed or scheme is blocked, fall back
-                    tryShareOrCopy(url);
-                }, 1200);
-                window.addEventListener('pagehide', function() {
-                    clearTimeout(fallbackTimer);
-                }, { once: true });
-                window.location.href = chromeUrl;
-                return;
-            }
-
-            // Fallback: a synthetic <a target="_blank"> click
-            try {
-                const a = document.createElement('a');
-                a.href = url;
-                a.target = '_blank';
-                a.rel = 'noopener noreferrer';
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                return;
-            } catch (e) {
-                // Ignore and fall back to share/copy
-            }
-
-            tryShareOrCopy(url);
-        }
-
-        function tryShareOrCopy(url) {
-            if (navigator.share) {
-                navigator.share({
-                    title: document.title || 'Open in Chrome',
-                    url: url
-                }).catch(function() {
-                    // User dismissed Share Sheet; fall back to copy
-                    copyLinkToClipboard(url);
-                });
-                return;
-            }
-            copyLinkToClipboard(url);
-        }
-
-        function copyLinkToClipboard(text) {
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(text).then(function() {
-                    alert('Link copied. Open it in Chrome.');
-                }).catch(function() {
-                    fallbackCopyTextToClipboard(text);
-                });
-            } else {
-                fallbackCopyTextToClipboard(text);
-            }
-        }
     </script>
 </body>
 </html>
