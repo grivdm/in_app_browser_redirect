@@ -227,9 +227,10 @@
             <p>The in-app browser limits some features. To continue, tap the button below or use the menu (three dots) in the corner.</p>
             
             <button id="android-intent-btn" class="btn android-only" onclick="tryAndroidIntent()">Open in Chrome</button>
+            <button id="ios-open-btn" class="btn" onclick="tryOpenInSafari()">Open in Safari</button>
             
             <div id="ios-instruction">
-                <p style="font-size: 0.9em; margin-top: 15px;">Tap the <strong>three dots (...)</strong> or <strong>Safari icon</strong> in the corner and select <strong>"Open in browser"</strong>.</p>
+                <p style="font-size: 0.9em; margin-top: 15px;">Tap <strong>Open in Safari</strong> above or use the menu (three dots / Safari icon) and select <strong>"Open in browser"</strong>.</p>
             </div>
         </div>
     </div>
@@ -439,6 +440,7 @@
             const mainContent = document.getElementById('main-content');
             const warningContent = document.getElementById('inapp-warning');
             const androidBtn = document.getElementById('android-intent-btn');
+            const iosOpenBtn = document.getElementById('ios-open-btn');
             const iosInstr = document.getElementById('ios-instruction');
 
             if (inApp) {
@@ -447,12 +449,14 @@
                 if (isAndroid()) {
                     // If Android, show the "Magic" transition button
                     androidBtn.style.display = 'inline-block';
+                    iosOpenBtn.style.display = 'none';
                     iosInstr.style.display = 'none';
                     // You can try autoclick (does not always work)
                     // tryAndroidIntent(); 
                 } else {
                     // If iOS or other, only show the instruction, since jumping out programmatically is difficult
                     androidBtn.style.display = 'none';
+                    iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
                 }
             } else {
                 // If a normal browser, show content or redirect
@@ -460,6 +464,62 @@
                 // window.location.href = "https://kuda-vam-nado.ru"; // Uncomment for auto-redirect
             }
         };
+
+        function tryOpenInSafari() {
+            const url = TARGET_URL;
+            // Try the same approach Timeleft uses on web: window.open with _blank.
+            // Some in-app browsers (including LinkedIn) intercept this and open Safari.
+            try {
+                const opened = window.open(url, '_blank');
+                if (opened) {
+                    opened.focus();
+                    return;
+                }
+            } catch (e) {
+                // Ignore and fall back to other options
+            }
+
+            // Fallback: a synthetic <a target="_blank"> click
+            try {
+                const a = document.createElement('a');
+                a.href = url;
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                return;
+            } catch (e) {
+                // Ignore and fall back to Share Sheet
+            }
+
+            // iOS does not allow direct programmatic opening of Safari from in-app.
+            // Best available UX is the Share Sheet, which includes "Open in Safari".
+            if (navigator.share) {
+                navigator.share({
+                    title: document.title || 'Open in Safari',
+                    url: url
+                }).catch(function() {
+                    // User dismissed Share Sheet; fall back to copy
+                    copyLinkToClipboard(url);
+                });
+                return;
+            }
+            copyLinkToClipboard(url);
+        }
+
+        function copyLinkToClipboard(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(function() {
+                    alert('Link copied. Use "Open in Safari" from the share menu.');
+                }).catch(function() {
+                    fallbackCopyTextToClipboard(text);
+                });
+            } else {
+                fallbackCopyTextToClipboard(text);
+            }
+        }
     </script>
 </body>
 </html>
