@@ -299,9 +299,7 @@
         function tryAndroidIntent() {
             const url = TARGET_URL.replace('https://', '').replace('http://', '');
             const intentUrl = `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
-            sessionStorage.setItem('chromeRedirectAttempted', 'true');
             window.location.href = intentUrl;
-            setTimeout(() => showSuccessMessage(), 500);
         }
 
         function buildChromeUrl(rawUrl) {
@@ -322,18 +320,15 @@
             const chromeUrl = buildChromeUrl(url);
             
             if (chromeUrl) {
-                sessionStorage.setItem('chromeRedirectAttempted', 'true');
                 const fallbackTimer = setTimeout(function() {
                     tryShareOrCopy(url);
                 }, 1200);
                 
                 window.addEventListener('pagehide', function() {
                     clearTimeout(fallbackTimer);
-                    showSuccessMessage();
                 }, { once: true });
                 
                 window.location.href = chromeUrl;
-                setTimeout(() => showSuccessMessage(), 500);
                 return;
             }
 
@@ -426,11 +421,7 @@
                 'Is iOS Alt Browser': isIOSAltBrowserDevice ? 'Yes ✓' : 'No ✗',
                 'Is Android': isAndroidDevice ? 'Yes ✓' : 'No ✗',
                 'Has WKMessageHandlers': hasWKMessageHandlers ? 'Yes ✓' : 'No ✗',
-                'Screen Width': window.screen.width + 'px',
-                'Screen Height': window.screen.height + 'px',
-                'Window Width': window.innerWidth + 'px',
-                'Window Height': window.innerHeight + 'px',
-                'Touch Points': navigator.maxTouchPoints || 0,
+
                 'Language': navigator.language || 'Unknown',
                 'Cookie Enabled': navigator.cookieEnabled ? 'Yes ✓' : 'No ✗',
                 'OnLine Status': navigator.onLine ? 'Online ✓' : 'Offline ✗'
@@ -517,10 +508,13 @@
                 iosOpenBtn.style.display = isIOS() ? 'inline-block' : 'none';
             }
 
-            // Check if user returned after redirect attempt
-            if (sessionStorage.getItem('chromeRedirectAttempted') === 'true') {
-                sessionStorage.removeItem('chromeRedirectAttempted');
-                showSuccessMessage();
+            // Check if we're in Chrome and NOT in in-app browser (successful redirect)
+            const isNowInChrome = /CriOS/.test(UA);
+            const isInAppBrowser = isInApp();
+            
+            if (isNowInChrome && !isInAppBrowser) {
+                // We successfully opened in Chrome - show success message
+                setTimeout(() => showSuccessMessage(), 300);
             }
         };
     </script>
